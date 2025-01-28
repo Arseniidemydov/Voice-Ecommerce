@@ -16,8 +16,8 @@
         }
 
         .voice-button {
-            width: 150px;  /* Reduced from 200px */
-            height: 150px; /* Reduced from 200px */
+            width: 150px;
+            height: 150px;
             border-radius: 50%;
             background: #0066ff;
             border: none;
@@ -33,6 +33,35 @@
         .voice-button::before {
             content: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="50" height="50" fill="white" class="bi bi-mic" viewBox="0 0 16 16"><path d="M3.5 6.5A.5.5 0 0 1 4 7v1a4 4 0 0 0 8 0V7a.5.5 0 0 1 1 0v1a5 5 0 0 1-4.5 4.975V15h3a.5.5 0 0 1 0 1h-7a.5.5 0 0 1 0-1h3v-2.025A5 5 0 0 1 3 8V7a.5.5 0 0 1 .5-.5"/><path d="M10 8a2 2 0 1 1-4 0V3a2 2 0 1 1 4 0zM8 0a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0V3a3 3 0 0 0-3-3"/></svg>');
             font-size: 40px;
+            transition: opacity 0.3s ease;
+        }
+
+        .voice-button.loading::before {
+            opacity: 0;
+        }
+
+        .loading-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            width: 200px;
+            font-size: 16px;
+            color: white;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            display: none;
+            font-weight: 500;
+        }
+
+        .loading-text.active {
+            opacity: 1;
+            display: block;
+        }
+
+        .voice-button.loading {
+            animation: backgroundPulse 2s infinite;
         }
 
         .voice-button.recording {
@@ -40,22 +69,10 @@
             background: #ff0000;
         }
 
-        .loading {
-            border: 5px solid #f3f3f3;
-            border-top: 5px solid #0066ff;
-            border-radius: 50%;
-            width: 50px;
-            height: 50px;
-            animation: spin 1s linear infinite;
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            display: none;
-        }
-
-        .loading.active {
-            display: block;
+        @keyframes backgroundPulse {
+            0% { background-color: #0066ff; }
+            50% { background-color: #3385ff; }
+            100% { background-color: #0066ff; }
         }
 
         @keyframes pulse {
@@ -64,20 +81,15 @@
             100% { transform: scale(1); }
         }
 
-        @keyframes spin {
-            0% { transform: translate(-50%, -50%) rotate(0deg); }
-            100% { transform: translate(-50%, -50%) rotate(360deg); }
-        }
-
         #response {
             margin: 20px;
-            padding: 30px 40px;  /* Increased padding */
+            padding: 30px 40px;
             background: rgba(255, 255, 255, 0.1);
             border-radius: 10px;
             max-width: 600px;
-            width: calc(100% - 80px);  /* Adjusted width with margins */
-            line-height: 1.6;  /* Added line spacing */
-            font-size: 16px;   /* Added font size */
+            width: calc(100% - 40px);
+            line-height: 1.6;
+            font-size: 16px;
         }
 
         .status-text {
@@ -86,28 +98,151 @@
             font-size: 14px;
             color: #888;
         }
+
+        /* Media styles */
+        #response .media-link {
+            color: #66b3ff;
+            text-decoration: underline;
+            display: block;
+            margin: 5px 0;
+            transition: color 0.3s ease;
+        }
+
+        #response .media-link:hover {
+            color: #99ccff;
+        }
+
+        #response .image-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 10px;
+        }
+
+        #response .image-container {
+            position: relative;
+            padding-bottom: 100%;
+            overflow: hidden;
+            border-radius: 8px;
+        }
+
+        #response .image-container img {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            cursor: pointer;
+            transition: transform 0.3s ease;
+        }
+
+        #response .image-container img:hover {
+            transform: scale(1.05);
+        }
     </style>
 </head>
 <body>
-    <div class="voice-button" id="talkButton">
-        <div class="loading" id="loadingIndicator"></div>
-    </div>
-    <div class="status-text" id="statusText">Click to talk to assistant</div>
+    <div class="voice-button" id="talkButton"></div>
+    <div class="status-text" id="statusText">Click to start recording</div>
     <div id="response"></div>
     
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <script>
         const ASSISTANT_ID = 'asst_CDvFyzLG7KL7aRuTymxyrY9W';
+        const loadingMessages = [
+            "I'm thinking now...",
+            "Looking for the best option for you...",
+            "Almost got it...",
+            "Finalizing the perfect response..."
+        ];
+
+        let currentMessageIndex = 0;
+        let loadingInterval;
+
         const button = document.querySelector('.voice-button');
         const responseDiv = document.getElementById('response');
-        const loadingIndicator = document.getElementById('loadingIndicator');
         const statusText = document.getElementById('statusText');
         let mediaRecorder;
         let audioChunks = [];
 
+        function startLoadingAnimation() {
+            currentMessageIndex = 0;
+            const loadingText = document.createElement('div');
+            loadingText.className = 'loading-text';
+            button.appendChild(loadingText);
+            
+            function updateLoadingMessage() {
+                loadingText.textContent = loadingMessages[currentMessageIndex];
+                loadingText.classList.add('active');
+                currentMessageIndex = (currentMessageIndex + 1) % loadingMessages.length;
+            }
+
+            button.classList.add('loading');
+            updateLoadingMessage();
+            loadingInterval = setInterval(updateLoadingMessage, 3000);
+        }
+
+        function stopLoadingAnimation() {
+            button.classList.remove('loading');
+            clearInterval(loadingInterval);
+            const loadingText = button.querySelector('.loading-text');
+            if (loadingText) {
+                loadingText.remove();
+            }
+        }
+
+        function convertContentToHTML(text) {
+            let parts = text.split('\n\n');
+            let spokenText = parts[0];
+            let mediaSection = '';
+
+            function isImageURL(url) {
+                return url.match(/\.(jpeg|jpg|gif|png)$/i) != null;
+            }
+
+            parts.forEach(part => {
+                if (part.startsWith('Links:') || part.startsWith('Images:')) {
+                    const urls = part.split('\n').slice(1);
+                    
+                    if (part.startsWith('Links:')) {
+                        mediaSection += '<br><strong>Links:</strong>';
+                        urls.forEach(url => {
+                            if (url.trim()) {
+                                mediaSection += `
+                                    <a href="${url.trim()}" target="_blank" class="media-link">
+                                        ${url.trim()}
+                                    </a>`;
+                            }
+                        });
+                    }
+                    
+                    if (part.startsWith('Images:')) {
+                        mediaSection += '<br><strong>Images:</strong><div class="image-grid">';
+                        urls.forEach(url => {
+                            if (url.trim()) {
+                                mediaSection += `
+                                    <div class="image-container">
+                                        <img src="${url.trim()}" alt="Product Image" 
+                                             onclick="window.open(this.src, '_blank')"
+                                             onerror="this.onerror=null; this.src='placeholder.jpg';">
+                                    </div>`;
+                            }
+                        });
+                        mediaSection += '</div>';
+                    }
+                }
+            });
+
+            return {
+                spokenText: spokenText,
+                formattedText: spokenText + mediaSection
+            };
+        }
+
         async function sendToOpenAI(blob) {
             try {
-                loadingIndicator.classList.add('active');
+                startLoadingAnimation();
                 statusText.textContent = 'Processing...';
 
                 const formData = new FormData();
@@ -141,10 +276,11 @@
                     `/api/openai/threads/${threadResponse.data.id}/messages`
                 );
                 const aiResponse = messagesResponse.data.data[0].content[0].text.value;
+                const formattedResponse = convertContentToHTML(aiResponse);
 
                 const speechResponse = await axios.post('/api/openai/audio/speech', {
                     model: "tts-1",
-                    input: aiResponse,
+                    input: formattedResponse.spokenText,
                     voice: "alloy"
                 }, {
                     responseType: 'arraybuffer'
@@ -155,8 +291,7 @@
                 const audio = new Audio(audioUrl);
                 await audio.play();
 
-                // Just show the AI response without labels
-                responseDiv.textContent = aiResponse;
+                responseDiv.innerHTML = formattedResponse.formattedText;
                 statusText.textContent = 'Click to start recording';
 
             } catch (error) {
@@ -164,7 +299,7 @@
                 responseDiv.textContent = 'Error processing request. Please try again.';
                 statusText.textContent = 'Error occurred';
             } finally {
-                loadingIndicator.classList.remove('active');
+                stopLoadingAnimation();
             }
         }
 
