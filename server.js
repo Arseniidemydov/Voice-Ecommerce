@@ -7,6 +7,12 @@ require('dotenv').config();
 
 const app = express();
 
+// Debug middleware to log all requests
+app.use((req, res, next) => {
+    console.log(`[DEBUG] ${req.method} ${req.path}`);
+    next();
+});
+
 // Configure multer for memory storage
 const upload = multer({
     storage: multer.memoryStorage(),
@@ -15,12 +21,13 @@ const upload = multer({
     }
 });
 
-// Serve static files from public directory
+// Basic middleware
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
 // Handle audio transcription
 app.post('/api/openai/audio/transcriptions', upload.single('file'), async (req, res) => {
+    console.log('[DEBUG] Transcription request received');
     if (!req.file) {
         return res.status(400).json({ error: 'No file uploaded' });
     }
@@ -53,6 +60,7 @@ app.post('/api/openai/audio/transcriptions', upload.single('file'), async (req, 
 
 // Handle thread creation
 app.post('/api/openai/threads', async (req, res) => {
+    console.log('[DEBUG] Thread creation request received');
     try {
         const response = await axios.post(
             'https://api.openai.com/v1/threads',
@@ -60,6 +68,7 @@ app.post('/api/openai/threads', async (req, res) => {
             {
                 headers: {
                     'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+                    'Content-Type': 'application/json',
                     'OpenAI-Beta': 'assistants=v2'
                 }
             }
@@ -73,6 +82,7 @@ app.post('/api/openai/threads', async (req, res) => {
 
 // Handle messages in threads
 app.post('/api/openai/threads/:threadId/messages', async (req, res) => {
+    console.log('[DEBUG] Message creation request received');
     try {
         const response = await axios.post(
             `https://api.openai.com/v1/threads/${req.params.threadId}/messages`,
@@ -80,6 +90,7 @@ app.post('/api/openai/threads/:threadId/messages', async (req, res) => {
             {
                 headers: {
                     'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+                    'Content-Type': 'application/json',
                     'OpenAI-Beta': 'assistants=v2'
                 }
             }
@@ -93,6 +104,7 @@ app.post('/api/openai/threads/:threadId/messages', async (req, res) => {
 
 // Handle runs in threads
 app.post('/api/openai/threads/:threadId/runs', async (req, res) => {
+    console.log('[DEBUG] Run creation request received');
     try {
         const response = await axios.post(
             `https://api.openai.com/v1/threads/${req.params.threadId}/runs`,
@@ -100,6 +112,7 @@ app.post('/api/openai/threads/:threadId/runs', async (req, res) => {
             {
                 headers: {
                     'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+                    'Content-Type': 'application/json',
                     'OpenAI-Beta': 'assistants=v2'
                 }
             }
@@ -113,6 +126,7 @@ app.post('/api/openai/threads/:threadId/runs', async (req, res) => {
 
 // Get run status
 app.get('/api/openai/threads/:threadId/runs/:runId', async (req, res) => {
+    console.log('[DEBUG] Run status request received');
     try {
         const response = await axios.get(
             `https://api.openai.com/v1/threads/${req.params.threadId}/runs/${req.params.runId}`,
@@ -132,6 +146,7 @@ app.get('/api/openai/threads/:threadId/runs/:runId', async (req, res) => {
 
 // Get messages from thread
 app.get('/api/openai/threads/:threadId/messages', async (req, res) => {
+    console.log('[DEBUG] Messages request received');
     try {
         const response = await axios.get(
             `https://api.openai.com/v1/threads/${req.params.threadId}/messages`,
@@ -151,6 +166,7 @@ app.get('/api/openai/threads/:threadId/messages', async (req, res) => {
 
 // Handle text-to-speech
 app.post('/api/openai/audio/speech', async (req, res) => {
+    console.log('[DEBUG] Text-to-speech request received');
     try {
         const response = await axios.post(
             'https://api.openai.com/v1/audio/speech',
@@ -174,5 +190,6 @@ app.post('/api/openai/audio/speech', async (req, res) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
-    console.log(`API Key present: ${!!process.env.OPENAI_API_KEY}`);
+    console.log('API Key present:', !!process.env.OPENAI_API_KEY);
+    console.log('Public directory:', path.join(__dirname, 'public'));
 });
