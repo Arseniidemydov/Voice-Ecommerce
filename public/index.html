@@ -1,364 +1,335 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Voice Assistant</title>
-    <style>
-        body {
-            background-color: #1a1a1a;
-            color: white;
-            font-family: Arial, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            min-height: 100vh;
-            margin: 0;
-            padding: 20px;
-            max-width: 800px;
-            margin: 0 auto;
-        }
-
-        .voice-button {
-    width: 150px;
-    height: 150px;
-    border-radius: 50%;
-    background: #0066ff;
-    border: none;
-    cursor: pointer;
-    position: relative;
-    transition: all 0.3s ease;
-    margin: 20px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="50" height="50" fill="white" class="bi bi-mic" viewBox="0 0 16 16"><path d="M3.5 6.5A.5.5 0 0 1 4 7v1a4 4 0 0 0 8 0V7a.5.5 0 0 1 1 0v1a5 5 0 0 1-4.5 4.975V15h3a.5.5 0 0 1 0 1h-7a.5.5 0 0 1 0-1h3v-2.025A5 5 0 0 1 3 8V7a.5.5 0 0 1 .5-.5"/><path d="M10 8a2 2 0 1 1-4 0V3a2 2 0 1 1 4 0zM8 0a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0V3a3 3 0 0 0-3-3"/></svg>');
-    background-repeat: no-repeat;
-    background-position: center;
-}
-
-/* Remove the previous microphone emoji */
-.voice-button::before {
-    content: none;
-}
-
-/* Update loading state to hide SVG */
-.voice-button.loading {
-    animation: backgroundPulse 2s infinite;
-    background-image: none;
-}
-        .loading-text {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            text-align: center;
-            width: 120px;
-            font-size: 14px;
-            color: white;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-            display: none;
-            font-weight: 700;
-            line-height: 1.2;
-        }
-
-        .loading-text.active {
-            opacity: 1;
-            display: block;
-        }
-
-        .voice-button.loading {
-            animation: backgroundPulse 2s infinite;
-        }
-
-        .voice-button.recording {
-            animation: pulse 1.5s infinite;
-            background: #ff0000;
-        }
-
-        @keyframes backgroundPulse {
-            0% { background-color: #0066ff; }
-            50% { background-color: #3385ff; }
-            100% { background-color: #0066ff; }
-        }
-
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.05); }
-            100% { transform: scale(1); }
-        }
-
-        #response {
-            margin: 20px auto;
-            padding: 30px 40px;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 10px;
-            max-width: 600px;
-            width: calc(100% - 80px);
-            line-height: 1.6;
-            font-size: 16px;
-            box-sizing: border-box;
-        }
-
-        .status-text {
-            text-align: center;
-            margin-top: 20px;
-            font-size: 14px;
-            color: #888;
-        }
-
-        .media-section {
-            margin-top: 20px;
-            padding-top: 20px;
-            border-top: 1px solid rgba(255, 255, 255, 0.1);
-            display: none;
-        }
-
-        .media-section.has-content {
-            display: block;
-        }
-
-        #response .media-link {
-            color: #66b3ff;
-            text-decoration: underline;
-            display: block;
-            margin: 8px 0;
-            transition: color 0.3s ease;
-            font-size: 14px;
-        }
-
-        #response .media-link:hover {
-            color: #99ccff;
-        }
-
-        #response .image-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 15px;
-            margin-top: 10px;
-        }
-
-        #response .image-container {
-            position: relative;
-            padding-bottom: 100%;
-            overflow: hidden;
-            border-radius: 8px;
-            background: rgba(255, 255, 255, 0.05);
-        }
-
-        #response .image-container img {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            cursor: pointer;
-            transition: transform 0.3s ease;
-        }
-
-        #response .image-container img:hover {
-            transform: scale(1.05);
-        }
-
-        strong {
-            color: #66b3ff;
-        }
-    </style>
+    <title>Real-time Voice Assistant</title>
+    <link rel="stylesheet" href="/styles/main.css"> 
 </head>
 <body>
-    <div class="voice-button" id="talkButton"></div>
-    <div class="status-text" id="statusText">Click to start recording</div>
+    <div class="voice-button" id="talkButton">
+        <div class="transcript" id="transcript"></div>
+    </div>
+    <div class="status-text" id="statusText">Click to start talking</div>
+    <div class="typing-indicator" id="typingIndicator">
+        <span class="dot"></span>
+        <span class="dot"></span>
+        <span class="dot"></span>
+    </div>
     <div id="response"></div>
-    
-    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+
     <script>
-        const ASSISTANT_ID = 'asst_CDvFyzLG7KL7aRuTymxyrY9W';
-        const loadingMessages = [
-            "Thinking...",
-            "Processing...",
-            "Almost ready...",
-            "Finalizing..."
-        ];
-
-        let currentMessageIndex = 0;
-        let loadingInterval;
-
-        const button = document.querySelector('.voice-button');
+        const button = document.getElementById('talkButton');
+        const transcript = document.getElementById('transcript');
         const responseDiv = document.getElementById('response');
         const statusText = document.getElementById('statusText');
-        let mediaRecorder;
-        let audioChunks = [];
+        const typingIndicator = document.getElementById('typingIndicator');
 
-        function startLoadingAnimation() {
-            currentMessageIndex = 0;
-            const loadingText = document.createElement('div');
-            loadingText.className = 'loading-text';
-            button.appendChild(loadingText);
-            
-            function updateLoadingMessage() {
-                loadingText.textContent = loadingMessages[currentMessageIndex];
-                loadingText.classList.add('active');
-                currentMessageIndex = (currentMessageIndex + 1) % loadingMessages.length;
+        let recognition;
+        let isListening = false;
+        let hasPlayedWelcome = false;
+        let silenceTimer;
+        let lastSpeechTime = Date.now();
+        const SILENCE_DURATION = 4000;
+        const CHECKING_INTERVAL = 2000; 
+        let currentSlide = 0;
+
+        const exampleQuestions = [
+            "What's the best product for knee injury?",
+            "Which compression therapy device is best for post-workout muscle recovery?",
+            "What’s the best product for reducing joint inflammation?",
+            "What is the best recovery product for improving sleep quality"
+        ];
+
+        function displayExampleQuestions() {
+    console.log('Displaying example questions...');  // Debug log
+    responseDiv.innerHTML = `
+        <div class="example-questions">
+            <h3>Try asking about:</h3>
+            <div class="questions-grid">
+                ${exampleQuestions.map(q => `
+                    <div class="question-card" onclick="handleExampleClick('${q}')">
+                        <p>${q}</p>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    `;
+}
+
+// Call it immediately
+displayExampleQuestions();
+
+        async function handleExampleClick(question) {
+            if (!hasPlayedWelcome) {
+                await playWelcomeMessage();
+                hasPlayedWelcome = true;
             }
-
-            button.classList.add('loading');
-            updateLoadingMessage();
-            loadingInterval = setInterval(updateLoadingMessage, 3000);
+            handleFinalTranscript(question);
         }
 
-        function stopLoadingAnimation() {
-            button.classList.remove('loading');
-            clearInterval(loadingInterval);
-            const loadingText = button.querySelector('.loading-text');
-            if (loadingText) {
-                loadingText.remove();
+
+function startSilenceDetection() {
+    clearInterval(silenceTimer);
+    silenceTimer = setInterval(() => {
+        const timeSinceLastSpeech = Date.now() - lastSpeechTime;
+        if (timeSinceLastSpeech > SILENCE_DURATION && !recognition.finalTranscript) {
+            stopListening();
+        }
+    }, CHECKING_INTERVAL);
+}
+
+        async function playWelcomeMessage() {
+            console.log('Playing welcome message...');
+            try {
+                const welcomeResponse = await fetch('/api/openai/audio/speech', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        input: "Give me a second..."
+                    })
+                });
+
+                if (!welcomeResponse.ok) {
+                    throw new Error(`HTTP error! status: ${welcomeResponse.status}`);
+                }
+
+                const blob = await welcomeResponse.blob();
+                const audio = new Audio(URL.createObjectURL(blob));
+                await audio.play();
+                responseDiv.innerHTML = "<p>Give me a second...</p>";
+            } catch (error) {
+                console.error('Welcome message error:', error);
             }
         }
 
-        function convertContentToHTML(text) {
-            let sections = text.split('\n\n');
-            let mainText = sections[0];
-            let linksSection = '';
-            let imagesSection = '';
-            let hasLinks = false;
-            let hasImages = false;
+        if ('webkitSpeechRecognition' in window) {
+            recognition = new webkitSpeechRecognition();
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            recognition.lang = 'en-US';
 
-            sections.forEach(section => {
-                if (section.startsWith('Links:')) {
-                    hasLinks = true;
-                    const links = section.split('\n').slice(1);
-                    linksSection = '<div class="media-section has-content"><strong>Links:</strong>';
-                    links.forEach(link => {
-                        if (link.trim()) {
-                            linksSection += `
-                                <a href="${link.trim()}" target="_blank" class="media-link">
-                                    ${link.trim()}
-                                </a>`;
-                        }
-                    });
-                    linksSection += '</div>';
-                }
-                else if (section.startsWith('Images:')) {
-                    hasImages = true;
-                    const images = section.split('\n').slice(1);
-                    imagesSection = '<div class="media-section has-content"><strong>Images:</strong><div class="image-grid">';
-                    images.forEach(imageUrl => {
-                        if (imageUrl.trim()) {
-                            imagesSection += `
-                                <div class="image-container">
-                                    <img src="${imageUrl.trim()}" alt="Product Image" 
-                                         onclick="window.open(this.src, '_blank')"
-                                         onerror="this.onerror=null; this.src='placeholder.jpg';">
-                                </div>`;
-                        }
-                    });
-                    imagesSection += '</div></div>';
-                }
-            });
+            recognition.onresult = (event) => {
+                lastSpeechTime = Date.now();
+                const result = event.results[event.results.length - 1];
+                const transcriptText = result[0].transcript;
+                transcript.textContent = transcriptText;
 
-            return {
-                spokenText: mainText,
-                formattedText: mainText + linksSection + imagesSection
+                if (result.isFinal) {
+                    clearTimeout(silenceTimer);
+                    handleFinalTranscript(transcriptText);
+                }
+            };
+
+            recognition.onaudiostart = () => {
+                startSilenceDetection();
+            };
+
+            recognition.onend = () => {
+                if (isListening) {
+                    recognition.start();
+                    startSilenceDetection();
+                }
+            };
+
+            recognition.onerror = (event) => {
+                console.error('Speech recognition error:', event.error);
+                if (event.error !== 'no-speech') {
+                    stopListening();
+                }
             };
         }
 
-        async function sendToOpenAI(blob) {
+        async function playAudioResponse(text) {
             try {
-                startLoadingAnimation();
-                statusText.textContent = 'Processing...';
-
-                const formData = new FormData();
-                formData.append('file', blob, 'audio.webm');
-                formData.append('model', 'whisper-1');
-
-                const transcriptionResponse = await axios.post('/api/openai/audio/transcriptions', formData);
-                const userText = transcriptionResponse.data.text;
-
-                const threadResponse = await axios.post('/api/openai/threads');
-
-                await axios.post(`/api/openai/threads/${threadResponse.data.id}/messages`, {
-                    role: 'user',
-                    content: userText
+                const response = await fetch('/api/openai/audio/speech', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ input: text })
                 });
 
-                const runResponse = await axios.post(`/api/openai/threads/${threadResponse.data.id}/runs`, {
-                    assistant_id: ASSISTANT_ID
-                });
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
 
-                let runStatus;
-                do {
-                    await new Promise(resolve => setTimeout(resolve, 1000));
-                    const statusResponse = await axios.get(
-                        `/api/openai/threads/${threadResponse.data.id}/runs/${runResponse.data.id}`
-                    );
-                    runStatus = statusResponse.data.status;
-                } while (runStatus === 'in_progress');
-
-                const messagesResponse = await axios.get(
-                    `/api/openai/threads/${threadResponse.data.id}/messages`
-                );
-                const aiResponse = messagesResponse.data.data[0].content[0].text.value;
-                const formattedResponse = convertContentToHTML(aiResponse);
-
-                const speechResponse = await axios.post('/api/openai/audio/speech', {
-                    model: "tts-1",
-                    input: formattedResponse.spokenText,
-                    voice: "alloy"
-                }, {
-                    responseType: 'arraybuffer'
-                });
-
-                const audioBlob = new Blob([speechResponse.data], { type: 'audio/mpeg' });
-                const audioUrl = URL.createObjectURL(audioBlob);
-                const audio = new Audio(audioUrl);
+                const blob = await response.blob();
+                const audio = new Audio(URL.createObjectURL(blob));
                 await audio.play();
-
-                responseDiv.innerHTML = formattedResponse.formattedText;
-                statusText.textContent = 'Click to start recording';
-
             } catch (error) {
-                console.error('Error:', error.response?.data || error);
-                responseDiv.textContent = 'Error processing request. Please try again.';
-                statusText.textContent = 'Error occurred';
-            } finally {
-                stopLoadingAnimation();
+                console.error('Audio playback error:', error);
             }
         }
 
-        button.onclick = async () => {
+        function addFollowUpSuggestions(response) {
+            if (response.toLowerCase().includes('multiple options') || 
+                response.toLowerCase().includes('several choices')) {
+                return `
+                    <div class="follow-up">
+                        <p>Would you like to:</p>
+                        <div class="follow-up-suggestions">
+                            <button class="follow-up-btn" onclick="handleFollowUp('Show me options under $50')">
+                                See budget options
+                            </button>
+                            <button class="follow-up-btn" onclick="handleFollowUp('Show me the top-rated ones')">
+                                See top-rated
+                            </button>
+                            <button class="follow-up-btn" onclick="handleFollowUp('Show me customer reviews')">
+                                Read reviews
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }
+            return '';
+        }
+
+        async function handleFollowUp(question) {
+            await handleFinalTranscript(question);
+        }
+
+
+        async function handleFinalTranscript(text) {
+            if (text.trim().toLowerCase() === 'stop listening') {
+                stopListening();
+                return;
+            }
+
+            typingIndicator.classList.add('active');
+            responseDiv.innerHTML = '';
+
             try {
-                if (!mediaRecorder) {
-                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    mediaRecorder = new MediaRecorder(stream, {
-                        mimeType: 'audio/webm;codecs=opus'
-                    });
-                    
-                    mediaRecorder.ondataavailable = (event) => {
-                        audioChunks.push(event.data);
-                    };
+                const response = await fetch('/api/assistant/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: text })
+                });
 
-                    mediaRecorder.onstop = async () => {
-                        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                        await sendToOpenAI(audioBlob);
-                        button.classList.remove('recording');
-                        audioChunks = [];
-                    };
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let fullResponse = '';
 
-                    button.classList.add('recording');
-                    statusText.textContent = 'Recording... Click to stop';
-                    mediaRecorder.start();
-                } else {
-                    mediaRecorder.stop();
-                    const tracks = mediaRecorder.stream.getTracks();
-                    tracks.forEach(track => track.stop());
-                    mediaRecorder = null;
-                    statusText.textContent = 'Processing...';
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+
+                    const chunk = decoder.decode(value);
+                    const lines = chunk.split('\n');
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const data = line.slice(5).trim();
+                            
+                            if (data === '[DONE]') continue;
+                            if (!data) continue;
+
+                            try {
+                                const parsed = JSON.parse(data);
+                                if (parsed.content) {
+                                    fullResponse = parsed.content;
+                                    responseDiv.innerHTML = formatResponse(parsed.content);
+                                }
+                            } catch (e) {
+                                console.error('Error parsing JSON:', e);
+                            }
+                        }
+                    }
                 }
+
+                const mainText = fullResponse.split('\n\n')[0];
+                await playAudioResponse(mainText);
+
             } catch (error) {
-                console.error('Microphone error:', error);
-                statusText.textContent = 'Error accessing microphone';
+                console.error('Error:', error);
+                responseDiv.innerHTML = `<p style="color: #ff4444;">Error: ${error.message}</p>`;
+            } finally {
+                typingIndicator.classList.remove('active');
+            }
+        }
+
+        function cleanImageUrl(url) {
+    // Remove markdown image syntax if present
+    const markdownMatch = url.match(/!\[.*?\]\((.*?)\)/);
+    if (markdownMatch) {
+        return markdownMatch[1]; // Return the URL part
+    }
+    return url.trim();
+}
+
+function formatResponse(text) {
+    const sections = text.split('\n\n');
+    let mainText = sections[0];
+    let formattedResponse = `<p>${mainText}</p>`;
+
+    sections.forEach((section) => {
+        if (section.startsWith('Images:')) {
+            const lines = section.split('\n').slice(1); // Skip 'Images:' line
+            formattedResponse += '<div class="media-section">';
+            formattedResponse += '<div class="product-grid">';
+            
+            // Process lines in groups of 3 (image, name, url)
+            for (let i = 0; i < lines.length; i += 3) {
+                const imageUrl = cleanImageUrl(lines[i]?.trim() || '');
+                const productName = (lines[i + 1]?.replace('Product:', '').trim()) || '';
+                const productUrl = (lines[i + 2]?.replace('URL:', '').trim()) || '#';
+
+                if (imageUrl && productName && productUrl) {
+                    formattedResponse += `
+                        <div class="product-item">
+                            <a href="${productUrl}" target="_blank" class="product-link">
+                                <div class="image-container">
+                                    <img src="${imageUrl}" alt="${productName}">
+                                </div>
+                                <div class="product-info">
+                                    <h4 class="product-name">${productName}</h4>
+                                </div>
+                            </a>
+                        </div>
+                    `;
+                }
+            }
+            formattedResponse += '</div></div>';
+        }
+    });
+
+    formattedResponse += addFollowUpSuggestions(text);
+    return formattedResponse;
+}
+
+        function startListening() {
+            if (!recognition) return;
+            
+            isListening = true;
+            button.classList.add('listening');
+            statusText.textContent = 'Listening...';
+            recognition.start();
+            startSilenceDetection();
+        }
+
+        function stopListening() {
+            if (!recognition) return;
+            
+            isListening = false;
+            button.classList.remove('listening');
+            statusText.textContent = 'Click to start talking';
+            clearInterval(silenceTimer);
+            recognition.stop();
+            transcript.textContent = '';
+        }
+
+        button.onclick = () => {
+            if (isListening) {
+                stopListening();
+            } else {
+                if (!hasPlayedWelcome) {
+                    playWelcomeMessage();
+                    hasPlayedWelcome = true;
+                }
+                startListening();
             }
         };
+
     </script>
 </body>
 </html>

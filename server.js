@@ -1,195 +1,116 @@
 const express = require('express');
-const axios = require('axios');
-const multer = require('multer');
+const OpenAI = require('openai');
+const cors = require('cors');
 const path = require('path');
-const FormData = require('form-data');
 require('dotenv').config();
 
 const app = express();
-
-// Debug middleware to log all requests
-app.use((req, res, next) => {
-    console.log(`[DEBUG] ${req.method} ${req.path}`);
-    next();
-});
-
-// Configure multer for memory storage
-const upload = multer({
-    storage: multer.memoryStorage(),
-    limits: {
-        fileSize: 10 * 1024 * 1024 // 10MB limit
-    }
+const openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY
 });
 
 // Basic middleware
+app.use(cors());
+app.use(express.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
-app.use(express.json());
 
-// Handle audio transcription
-app.post('/api/openai/audio/transcriptions', upload.single('file'), async (req, res) => {
-    console.log('[DEBUG] Transcription request received');
-    if (!req.file) {
-        return res.status(400).json({ error: 'No file uploaded' });
-    }
-
-    try {
-        const formData = new FormData();
-        formData.append('file', req.file.buffer, {
-            filename: 'audio.webm',
-            contentType: req.file.mimetype,
-        });
-        formData.append('model', 'whisper-1');
-
-        const response = await axios.post(
-            'https://api.openai.com/v1/audio/transcriptions',
-            formData,
-            {
-                headers: {
-                    ...formData.getHeaders(),
-                    'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
-                }
-            }
-        );
-
-        res.json(response.data);
-    } catch (error) {
-        console.error('Transcription error:', error.response?.data || error);
-        res.status(500).json({ error: error.message });
-    }
+// Debug middleware to log requests
+app.use((req, res, next) => {
+    console.log(`${req.method} ${req.path}`);
+    next();
 });
 
-// Handle thread creation
-app.post('/api/openai/threads', async (req, res) => {
-    console.log('[DEBUG] Thread creation request received');
-    try {
-        const response = await axios.post(
-            'https://api.openai.com/v1/threads',
-            {},
-            {
-                headers: {
-                    'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-                    'Content-Type': 'application/json',
-                    'OpenAI-Beta': 'assistants=v2'
-                }
-            }
-        );
-        res.json(response.data);
-    } catch (error) {
-        console.error('Thread creation error:', error.response?.data || error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// Handle messages in threads
-app.post('/api/openai/threads/:threadId/messages', async (req, res) => {
-    console.log('[DEBUG] Message creation request received');
-    try {
-        const response = await axios.post(
-            `https://api.openai.com/v1/threads/${req.params.threadId}/messages`,
-            req.body,
-            {
-                headers: {
-                    'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-                    'Content-Type': 'application/json',
-                    'OpenAI-Beta': 'assistants=v2'
-                }
-            }
-        );
-        res.json(response.data);
-    } catch (error) {
-        console.error('Message creation error:', error.response?.data || error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// Handle runs in threads
-app.post('/api/openai/threads/:threadId/runs', async (req, res) => {
-    console.log('[DEBUG] Run creation request received');
-    try {
-        const response = await axios.post(
-            `https://api.openai.com/v1/threads/${req.params.threadId}/runs`,
-            req.body,
-            {
-                headers: {
-                    'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-                    'Content-Type': 'application/json',
-                    'OpenAI-Beta': 'assistants=v2'
-                }
-            }
-        );
-        res.json(response.data);
-    } catch (error) {
-        console.error('Run creation error:', error.response?.data || error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// Get run status
-app.get('/api/openai/threads/:threadId/runs/:runId', async (req, res) => {
-    console.log('[DEBUG] Run status request received');
-    try {
-        const response = await axios.get(
-            `https://api.openai.com/v1/threads/${req.params.threadId}/runs/${req.params.runId}`,
-            {
-                headers: {
-                    'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-                    'OpenAI-Beta': 'assistants=v2'
-                }
-            }
-        );
-        res.json(response.data);
-    } catch (error) {
-        console.error('Run status error:', error.response?.data || error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// Get messages from thread
-app.get('/api/openai/threads/:threadId/messages', async (req, res) => {
-    console.log('[DEBUG] Messages request received');
-    try {
-        const response = await axios.get(
-            `https://api.openai.com/v1/threads/${req.params.threadId}/messages`,
-            {
-                headers: {
-                    'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-                    'OpenAI-Beta': 'assistants=v2'
-                }
-            }
-        );
-        res.json(response.data);
-    } catch (error) {
-        console.error('Messages retrieval error:', error.response?.data || error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// Handle text-to-speech
+// Speech synthesis endpoint
 app.post('/api/openai/audio/speech', async (req, res) => {
-    console.log('[DEBUG] Text-to-speech request received');
+    console.log('Received speech request');
     try {
-        const response = await axios.post(
-            'https://api.openai.com/v1/audio/speech',
-            req.body,
-            {
-                headers: {
-                    'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-                    'Content-Type': 'application/json'
-                },
-                responseType: 'arraybuffer'
-            }
-        );
-        res.set('Content-Type', 'audio/mpeg');
-        res.send(response.data);
+        if (!req.body || !req.body.input) {
+            throw new Error('No input text provided');
+        }
+
+        console.log('Creating speech with text:', req.body.input);
+        
+        const response = await openai.audio.speech.create({
+            model: 'tts-1',
+            voice: 'alloy',
+            input: req.body.input,
+        });
+
+        if (!response) {
+            throw new Error('No response from OpenAI');
+        }
+
+        const buffer = Buffer.from(await response.arrayBuffer());
+
+        res.set({
+            'Content-Type': 'audio/mpeg',
+            'Content-Length': buffer.length,
+        });
+
+        res.send(buffer);
     } catch (error) {
-        console.error('Text-to-speech error:', error.response?.data || error);
+        console.error('Speech error:', error);
         res.status(500).json({ error: error.message });
     }
+});
+
+// Assistant chat endpoint
+app.post('/api/assistant/chat', async (req, res) => {
+    try {
+        const { message } = req.body;
+        const assistantId = 'asst_CDvFyzLG7KL7aRuTymxyrY9W';
+
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
+
+        const thread = await openai.beta.threads.create();
+
+        await openai.beta.threads.messages.create(thread.id, {
+            role: "user",
+            content: message
+        });
+
+        const run = await openai.beta.threads.runs.create(thread.id, {
+            assistant_id: assistantId
+        });
+
+        while (true) {
+            const runStatus = await openai.beta.threads.runs.retrieve(thread.id, run.id);
+            
+            if (runStatus.status === 'completed') {
+                const messages = await openai.beta.threads.messages.list(thread.id);
+                const response = messages.data[0].content[0].text.value;
+                res.write(`data: ${JSON.stringify({ content: response })}\n\n`);
+                res.write('data: [DONE]\n\n');
+                res.end();
+                break;
+            } else if (runStatus.status === 'failed') {
+                throw new Error('Assistant run failed');
+            }
+
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+    } catch (error) {
+        console.error('Chat error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+    console.error('Error:', err);
+    res.status(500).json({ error: err.message });
+});
+
+// Handle 404
+app.use((req, res) => {
+    console.log('404 for', req.path);
+    res.status(404).json({ error: 'Not found' });
 });
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
-    console.log('API Key present:', !!process.env.OPENAI_API_KEY);
-    console.log('Public directory:', path.join(__dirname, 'public'));
+    console.log('OpenAI API Key present:', !!process.env.OPENAI_API_KEY);
 });
