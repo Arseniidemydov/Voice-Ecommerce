@@ -179,7 +179,15 @@
             responseDiv.innerHTML = '';
 
             try {
-                const response = await fetch('/api/assistant/chat', {
+                // Determine if this is a product search query
+                const isProductQuery = /product|recommend|buy|purchase|best|knee|therapy|brace|support|compression|recovery|pain|injury|exercise|workout/i.test(text);
+                
+                // Choose the appropriate endpoint
+                const endpoint = isProductQuery ? '/api/assistant/products' : '/api/assistant/chat';
+                
+                console.log(`Using endpoint: ${endpoint} for query: "${text}"`);
+                
+                const response = await fetch(endpoint, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ message: text })
