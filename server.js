@@ -2,6 +2,7 @@ const express = require('express');
 const OpenAI = require('openai');
 const cors = require('cors');
 const path = require('path');
+const { scrapeProducts } = require('./scraper');
 require('dotenv').config();
 
 const app = express();
@@ -18,6 +19,31 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use((req, res, next) => {
     console.log(`${req.method} ${req.path}`);
     next();
+});
+
+// New product search endpoint using FireCrawl
+app.post('/api/products/search', async (req, res) => {
+    console.log('Received product search request');
+    try {
+        const { query, limit = 5, websites = ['amazon', 'walmart'] } = req.body;
+        
+        if (!query) {
+            return res.status(400).json({ error: 'No search query provided' });
+        }
+        
+        console.log(`Searching for products: "${query}"`);
+        
+        const results = await scrapeProducts({
+            query,
+            limit,
+            websites
+        });
+        
+        res.json(results);
+    } catch (error) {
+        console.error('Product search error:', error);
+        res.status(500).json({ error: error.message });
+    }
 });
 
 // Speech synthesis endpoint
@@ -54,7 +80,65 @@ app.post('/api/openai/audio/speech', async (req, res) => {
     }
 });
 
-// Assistant chat endpoint
+// New hybrid endpoint that uses OpenAI to understand the query then searches products
+app.post('/api/assistant/products', async (req, res) => {
+    try {
+        const { message } = req.body;
+        
+        if (!message) {
+            return res.status(400).json({ error: 'No message provided' });
+        }
+        
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
+        
+        // First, use OpenAI to understand the query and extract search parameters
+        console.log('Analyzing query with OpenAI:', message);
+        
+        const completion = await openai.chat.completions.create({
+            model: "gpt-4o",
+            messages: [
+                {
+                    role: "system",
+                    content: "You are a product recommendation specialist. Extract search parameters from user queries. Return ONLY a JSON object with these fields: query (search string), category (optional), priceRange (optional), keyFeatures (array, optional), sortBy (optional). Nothing else."
+                },
+                { role: "user", content: message }
+            ],
+            response_format: { type: "json_object" }
+        });
+        
+        // Parse the search parameters from the OpenAI response
+        const searchParams = JSON.parse(completion.choices[0].message.content);
+        console.log('Extracted search parameters:', searchParams);
+        
+        // Use the extracted query to search for products
+        const searchQuery = searchParams.query;
+        
+        // Stream a message that we're searching
+        res.write(`data: ${JSON.stringify({ content: `Searching for "${searchQuery}"...` })}\n\n`);
+        
+        // Search for products using our scraper
+        const products = await scrapeProducts({
+            query: searchQuery,
+            limit: 5,
+            websites: ['amazon', 'walmart']
+        });
+        
+        // Send the final response
+        res.write(`data: ${JSON.stringify({ content: products.text })}\n\n`);
+        res.write('data: [DONE]\n\n');
+        res.end();
+        
+    } catch (error) {
+        console.error('Hybrid search error:', error);
+        res.write(`data: ${JSON.stringify({ content: `Sorry, I encountered an error: ${error.message}` })}\n\n`);
+        res.write('data: [DONE]\n\n');
+        res.end();
+    }
+});
+
+// Original Assistant chat endpoint (keep for backward compatibility)
 app.post('/api/assistant/chat', async (req, res) => {
     try {
         const { message } = req.body;
@@ -113,4 +197,5 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
     console.log('OpenAI API Key present:', !!process.env.OPENAI_API_KEY);
+    console.log('FireCrawl API Key present:', !!process.env.FIRECRAWL_API_KEY);
 });
