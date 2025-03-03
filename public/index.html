@@ -28,21 +28,25 @@
         let hasPlayedWelcome = false;
         let silenceTimer;
         let lastSpeechTime = Date.now();
+        let isPlayingAudio = false; // Flag to track if audio is playing
+        let lastUserInteraction = Date.now(); // Track user's last interaction
+        let lastQuery = ""; // Store the last query to prevent duplicates
         const SILENCE_DURATION = 4000;
         const CHECKING_INTERVAL = 2000; 
+        const MIN_INTERACTION_TIME = 10000; // Min time between different searches in ms
 
         const exampleQuestions = [
             "What's the best product for knee injury?",
             "Which compression therapy device is best for post-workout muscle recovery?",
             "What's the best product for reducing joint inflammation?",
-            "What is the best recovery product for improving sleep quality"
+            "Which products can help with back support?"
         ];
 
         function displayExampleQuestions() {
             console.log('Displaying example questions...');
             responseDiv.innerHTML = `
                 <div class="example-questions">
-                    <h3>Try asking about:</h3>
+                    <h3>Try asking about RecoverFit.co.uk products:</h3>
                     <div class="questions-grid">
                         ${exampleQuestions.map(q => `
                             <div class="question-card" onclick="handleExampleClick('${q}')">
@@ -62,6 +66,7 @@
                 await playWelcomeMessage();
                 hasPlayedWelcome = true;
             }
+            lastUserInteraction = Date.now();
             handleFinalTranscript(question);
         }
 
@@ -69,7 +74,7 @@
             clearInterval(silenceTimer);
             silenceTimer = setInterval(() => {
                 const timeSinceLastSpeech = Date.now() - lastSpeechTime;
-                if (timeSinceLastSpeech > SILENCE_DURATION && !recognition.finalTranscript) {
+                if (timeSinceLastSpeech > SILENCE_DURATION && isListening && !isPlayingAudio) {
                     stopListening();
                 }
             }, CHECKING_INTERVAL);
@@ -78,6 +83,7 @@
         async function playWelcomeMessage() {
             console.log('Playing welcome message...');
             try {
+                isPlayingAudio = true;
                 const welcomeResponse = await fetch('/api/openai/audio/speech', {
                     method: 'POST',
                     headers: {
@@ -94,10 +100,14 @@
 
                 const blob = await welcomeResponse.blob();
                 const audio = new Audio(URL.createObjectURL(blob));
+                audio.onended = () => {
+                    isPlayingAudio = false;
+                };
                 await audio.play();
                 responseDiv.innerHTML = "<p>Give me a second...</p>";
             } catch (error) {
                 console.error('Welcome message error:', error);
+                isPlayingAudio = false;
             }
         }
 
@@ -108,6 +118,11 @@
             recognition.lang = 'en-US';
 
             recognition.onresult = (event) => {
+                // Don't process speech recognition if audio is playing
+                if (isPlayingAudio) {
+                    return;
+                }
+                
                 lastSpeechTime = Date.now();
                 const result = event.results[event.results.length - 1];
                 const transcriptText = result[0].transcript;
@@ -124,7 +139,7 @@
             };
 
             recognition.onend = () => {
-                if (isListening) {
+                if (isListening && !isPlayingAudio) {
                     recognition.start();
                     startSilenceDetection();
                 }
@@ -140,6 +155,9 @@
 
         async function playAudioResponse(text) {
             try {
+                isPlayingAudio = true;
+                stopListening(); // Stop listening while audio is playing
+                
                 const response = await fetch('/api/openai/audio/speech', {
                     method: 'POST',
                     headers: {
@@ -154,9 +172,22 @@
 
                 const blob = await response.blob();
                 const audio = new Audio(URL.createObjectURL(blob));
+                
+                // When audio ends, resume listening if needed
+                audio.onended = () => {
+                    isPlayingAudio = false;
+                    if (button.classList.contains('listening')) {
+                        startListening();
+                    }
+                };
+                
                 await audio.play();
             } catch (error) {
                 console.error('Audio playback error:', error);
+                isPlayingAudio = false;
+                if (button.classList.contains('listening')) {
+                    startListening();
+                }
             }
         }
 
@@ -166,21 +197,37 @@
             suggestions.forEach(s => s.remove());
             
             // Handle the follow-up question
+            lastUserInteraction = Date.now();
             await handleFinalTranscript(question);
         }
 
         async function handleFinalTranscript(text) {
+            // Ignore requests if audio is playing or if it's too soon after last interaction
+            if (isPlayingAudio || 
+                (Date.now() - lastUserInteraction < MIN_INTERACTION_TIME && text === lastQuery)) {
+                console.log('Ignoring repeated request or audio is playing');
+                return;
+            }
+            
+            // Update interaction time and last query
+            lastUserInteraction = Date.now();
+            lastQuery = text;
+            
             if (text.trim().toLowerCase() === 'stop listening') {
                 stopListening();
                 return;
             }
 
             typingIndicator.classList.add('active');
-            responseDiv.innerHTML = '';
+            
+            // Don't clear the response div if it already has product results
+            if (!responseDiv.querySelector('.product-grid')) {
+                responseDiv.innerHTML = '';
+            }
 
             try {
-                // Determine if this is a product search query
-                const isProductQuery = /product|recommend|buy|purchase|best|knee|therapy|brace|support|compression|recovery|pain|injury|exercise|workout/i.test(text);
+                // Determine if this is a product query
+                const isProductQuery = /product|recommend|buy|purchase|best|knee|therapy|brace|support|compression|recovery|pain|injury|exercise|workout|back|wrist|ankle/i.test(text);
                 
                 // Choose the appropriate endpoint
                 const endpoint = isProductQuery ? '/api/assistant/products' : '/api/assistant/chat';
@@ -230,6 +277,7 @@
             } catch (error) {
                 console.error('Error:', error);
                 responseDiv.innerHTML = `<p style="color: #ff4444;">Error: ${error.message}</p>`;
+                isPlayingAudio = false;
             } finally {
                 typingIndicator.classList.remove('active');
             }
@@ -310,14 +358,14 @@
                     <div class="follow-up-section">
                         <h4>You might want to ask:</h4>
                         <div class="suggestion-grid">
-                            <button class="suggestion-button" onclick="handleFollowUp('Show me alternative products')">
+                            <button class="suggestion-button" onclick="handleFollowUp('Show me alternative products for ${products[0].productName.split(' ')[0]}')">
                                 Show me alternative products
                             </button>
-                            <button class="suggestion-button" onclick="handleFollowUp('Tell me more about this product\\'s features')">
-                                Tell me more about this product's features
+                            <button class="suggestion-button" onclick="handleFollowUp('Tell me more about ${products[0].productName}')">
+                                Tell me more about this product
                             </button>
-                            <button class="suggestion-button" onclick="handleFollowUp('What accessories go well with this?')">
-                                What accessories go well with this?
+                            <button class="suggestion-button" onclick="handleFollowUp('What other products do you recommend for recovery?')">
+                                What other recovery products do you have?
                             </button>
                         </div>
                     </div>
@@ -328,7 +376,7 @@
         }
 
         function startListening() {
-            if (!recognition) return;
+            if (!recognition || isPlayingAudio) return;
             
             isListening = true;
             button.classList.add('listening');
@@ -353,10 +401,13 @@
                 stopListening();
             } else {
                 if (!hasPlayedWelcome) {
-                    playWelcomeMessage();
+                    playWelcomeMessage().then(() => {
+                        if (!isPlayingAudio) startListening();
+                    });
                     hasPlayedWelcome = true;
+                } else {
+                    if (!isPlayingAudio) startListening();
                 }
-                startListening();
             }
         };
     </script>
