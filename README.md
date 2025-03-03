@@ -1,15 +1,16 @@
 # Voice-Ecommerce: Real-time Voice Product Recommendations
 
-A real-time voice assistant for product recommendations, featuring a hybrid approach that combines GPT-4's language understanding with product data.
+A real-time voice assistant for product recommendations from RecoverFit.co.uk, featuring a hybrid approach that combines GPT-4's language understanding with live web scraping.
 
 ## Features
 
 - 🎤 **Voice Recognition** with automatic silence detection
-- 🔍 **Product Recommendations** with structured search
+- 🔍 **Real-time Web Scraping** of RecoverFit.co.uk products
 - 🧠 **Hybrid Intelligence** using GPT-4 for query understanding
 - 🔊 **Text-to-Speech** for natural spoken responses
 - 📱 **Mobile-responsive UI** with product grid display
 - 📊 **Follow-up Suggestions** for interactive conversations
+- 💾 **Smart Caching** to improve performance and reduce redundant scraping
 
 ## How It Works
 
@@ -18,11 +19,29 @@ The application uses a hybrid approach:
 1. **Voice Input**: The user speaks a product query via their microphone
 2. **Language Processing**: The application determines if this is a product query 
 3. **Query Analysis**: GPT-4 extracts structured search parameters from natural language
-4. **Product Search**: Demo data is searched for matching products (can be replaced with real scraping)
+4. **Web Scraping**: The application scrapes RecoverFit.co.uk for matching products
 5. **Response Generation**: Results are formatted in a consistent structure
 6. **Voice Output**: The response is spoken aloud via text-to-speech
 
-This approach offers the best of both worlds: GPT's language understanding with formatted product data.
+## Scraping Architecture
+
+The scraping system has several features:
+
+1. **Multi-Method Scraping**: Uses both Axios/Cheerio and Puppeteer approaches
+   - Tries simple Axios/Cheerio scraping first for speed
+   - Falls back to Puppeteer (headless browser) if needed for more complex pages
+   
+2. **Fallback System**: Includes pre-defined product data as a fallback
+   - Ensures users always get product recommendations, even if scraping fails
+   - Categories fallback products to match search intent
+
+3. **Error Handling**: Robust error handling with timeouts
+   - Sets 25-second timeout to prevent long-running scrapes
+   - Provides graceful degradation with user-friendly messages
+
+4. **Caching**: Implements in-memory caching for performance
+   - Stores recent search results to reduce redundant scraping
+   - Configurable TTL (Time-To-Live) and cache size
 
 ## Setup Instructions
 
@@ -57,8 +76,8 @@ npm start
 
 ## API Endpoints
 
-- **/api/assistant/products**: Hybrid endpoint that uses GPT to analyze the query and searches for products
-- **/api/products/search**: Direct product search endpoint
+- **/api/assistant/products**: Hybrid endpoint that uses GPT to analyze the query and searches RecoverFit.co.uk
+- **/api/products/search**: Direct product search endpoint that scrapes RecoverFit.co.uk
 - **/api/assistant/chat**: Original OpenAI Assistant endpoint (for non-product queries)
 - **/api/openai/audio/speech**: Text-to-speech conversion
 - **/api/cache/stats**: Get cache statistics
@@ -68,14 +87,14 @@ npm start
 ## Project Structure
 
 - **server.js**: Main Express server with API endpoints
-- **scraper.js**: Product data handling (currently using mock data)
+- **scraper.js**: Real-time scraping logic for RecoverFit.co.uk
 - **cache.js**: In-memory caching system for product searches
 - **public/index.html**: Front-end interface with voice recognition
 - **public/styles/main.css**: Styling for the UI
 
 ## Product Response Format
 
-The application expects product data in this format:
+The application returns product data in this format:
 
 ```
 Main text first.
@@ -95,8 +114,8 @@ To integrate with a GPT Assistant, add a function with this definition:
 
 ```json
 {
-  "name": "searchProducts",
-  "description": "Search for products based on user query",
+  "name": "searchRecoverFitProducts",
+  "description": "Search for products available on the RecoverFit.co.uk website based on user requirements",
   "parameters": {
     "type": "object",
     "properties": {
@@ -115,15 +134,35 @@ To integrate with a GPT Assistant, add a function with this definition:
 }
 ```
 
-The function should call your deployed API at `/api/products/search`.
+The function implementation should call your deployed API:
+
+```javascript
+// Implementation for searchRecoverFitProducts function
+const response = await fetch('https://voice-ecommerce.onrender.com/api/products/search', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    query: arguments.query,
+    limit: arguments.limit || 5
+  })
+});
+
+// Parse response
+const data = await response.json();
+
+// Return the results
+return data;
+```
 
 ## Future Improvements
 
-- Integration with real product data APIs
-- User preferences and personalized recommendations
-- Product filtering by price, ratings, etc.
-- Integration with specific e-commerce platforms
-- Advanced voice commands for filtering and sorting
+- Support for product filtering by price, category, etc.
+- User personalization based on past searches
+- More sophisticated scraping with price comparison
+- Product reviews integration
+- Rich media support (videos, 3D models)
 
 ## License
 
