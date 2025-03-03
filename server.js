@@ -2,7 +2,7 @@ const express = require('express');
 const OpenAI = require('openai');
 const cors = require('cors');
 const path = require('path');
-const { scrapeProducts } = require('./scraper');
+const { scrapeProducts, getCacheStats, clearCache } = require('./scraper');
 require('dotenv').config();
 
 const app = express();
@@ -21,11 +21,20 @@ app.use((req, res, next) => {
     next();
 });
 
+// Cache management endpoints
+app.get('/api/cache/stats', (req, res) => {
+    res.json(getCacheStats());
+});
+
+app.post('/api/cache/clear', (req, res) => {
+    res.json(clearCache());
+});
+
 // New product search endpoint using FireCrawl
 app.post('/api/products/search', async (req, res) => {
     console.log('Received product search request');
     try {
-        const { query, limit = 5, websites = ['amazon', 'walmart'] } = req.body;
+        const { query, limit = 5, websites = ['amazon', 'walmart'], useCache = true } = req.body;
         
         if (!query) {
             return res.status(400).json({ error: 'No search query provided' });
@@ -36,7 +45,8 @@ app.post('/api/products/search', async (req, res) => {
         const results = await scrapeProducts({
             query,
             limit,
-            websites
+            websites,
+            useCache
         });
         
         res.json(results);
@@ -179,6 +189,17 @@ app.post('/api/assistant/chat', async (req, res) => {
         console.error('Chat error:', error);
         res.status(500).json({ error: error.message });
     }
+});
+
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+    res.json({
+        status: 'ok',
+        timestamp: new Date().toISOString(),
+        openaiKeyPresent: !!process.env.OPENAI_API_KEY,
+        firecrawlKeyPresent: !!process.env.FIRECRAWL_API_KEY,
+        cacheStats: getCacheStats()
+    });
 });
 
 // Error handling middleware
