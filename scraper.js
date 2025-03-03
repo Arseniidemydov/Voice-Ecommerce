@@ -1,12 +1,14 @@
 const axios = require('axios');
+const cheerio = require('cheerio');
+const puppeteer = require('puppeteer');
 const productCache = require('./cache');
 
 /**
- * Mock product data from RecoverFit.co.uk for demo purposes
- * In a real implementation, this would come from an API or web scraping
+ * Fallback mock product data from RecoverFit.co.uk 
+ * Used when scraping fails or for search terms with no results
  */
-const MOCK_PRODUCTS = {
-  'knee brace': [
+const FALLBACK_PRODUCTS = {
+  'knee': [
     {
       title: 'Knee Sleeve for Sports and Daily Wear',
       image: 'https://recoverfit.co.uk/cdn/shop/files/Knee-sleeve-pair-web_540x.jpg',
@@ -22,68 +24,6 @@ const MOCK_PRODUCTS = {
       price: 34.99,
       rating: 4.7,
       store: 'RecoverFit'
-    },
-    {
-      title: 'Patella Stabilizing Knee Brace',
-      image: 'https://recoverfit.co.uk/cdn/shop/products/patella-stabilising-front_540x.jpg',
-      url: 'https://recoverfit.co.uk/products/knee-brace-with-patella-stabiliser',
-      price: 39.99,
-      rating: 4.8,
-      store: 'RecoverFit'
-    }
-  ],
-  'compression therapy': [
-    {
-      title: 'Compression Arm Sleeves',
-      image: 'https://recoverfit.co.uk/cdn/shop/products/Arm-compression-sleeve-camo_540x.jpg',
-      url: 'https://recoverfit.co.uk/products/compression-arm-sleeves',
-      price: 19.99,
-      rating: 4.6,
-      store: 'RecoverFit'
-    },
-    {
-      title: 'Compression Calf Sleeves',
-      image: 'https://recoverfit.co.uk/cdn/shop/products/black-calf-compression-sleeve_540x.jpg',
-      url: 'https://recoverfit.co.uk/products/compression-calf-sleeves',
-      price: 19.99,
-      rating: 4.7,
-      store: 'RecoverFit'
-    }
-  ],
-  'massage': [
-    {
-      title: 'Percussion Massage Gun',
-      image: 'https://recoverfit.co.uk/cdn/shop/products/Massage-gun-main_540x.jpg',
-      url: 'https://recoverfit.co.uk/products/recoverfit-percussion-massage-gun',
-      price: 129.99,
-      rating: 4.9,
-      store: 'RecoverFit'
-    },
-    {
-      title: 'Massage Roller Ball',
-      image: 'https://recoverfit.co.uk/cdn/shop/products/massage-ball-set_540x.jpg',
-      url: 'https://recoverfit.co.uk/products/massage-ball-set',
-      price: 19.99,
-      rating: 4.7,
-      store: 'RecoverFit'
-    }
-  ],
-  'wrist support': [
-    {
-      title: 'Adjustable Wrist Support',
-      image: 'https://recoverfit.co.uk/cdn/shop/products/wrist-support-close_540x.jpg',
-      url: 'https://recoverfit.co.uk/products/adjustable-wrist-support',
-      price: 14.99,
-      rating: 4.5,
-      store: 'RecoverFit'
-    },
-    {
-      title: 'Wrist and Thumb Support',
-      image: 'https://recoverfit.co.uk/cdn/shop/products/wrist-thumb-support-front_540x.jpg',
-      url: 'https://recoverfit.co.uk/products/wrist-and-thumb-support',
-      price: 19.99,
-      rating: 4.6,
-      store: 'RecoverFit'
     }
   ],
   'back': [
@@ -96,33 +36,190 @@ const MOCK_PRODUCTS = {
       store: 'RecoverFit'
     },
     {
-      title: 'Posture Corrector',
-      image: 'https://recoverfit.co.uk/cdn/shop/products/Clavicle-brace-front_540x.jpg',
-      url: 'https://recoverfit.co.uk/products/posture-corrector',
-      price: 24.99,
-      rating: 4.5,
+      title: 'Hyperice Venom Back',
+      image: 'https://recoverfit.co.uk/cdn/shop/products/VENOM2BACK_1280x1280.png?v=1677587160',
+      url: 'https://recoverfit.co.uk/products/venom-back',
+      price: 249.99,
+      rating: 4.9,
       store: 'RecoverFit'
     }
   ],
-  'ankle': [
+  'massage': [
     {
-      title: 'Ankle Support Brace',
-      image: 'https://recoverfit.co.uk/cdn/shop/products/ankle-support-black-front_540x.jpg',
-      url: 'https://recoverfit.co.uk/products/ankle-support-brace',
-      price: 19.99,
-      rating: 4.6,
+      title: 'Theragun PRO Plus',
+      image: 'https://recoverfit.co.uk/cdn/shop/files/ProductTemplate_4_fb1f2fdb-c88b-44f4-8a9a-077620b24eef_1080x1080.png?v=1710256805',
+      url: 'https://recoverfit.co.uk/products/theragun-pro',
+      price: 549.99,
+      rating: 5.0,
       store: 'RecoverFit'
     },
     {
-      title: 'Adjustable Ankle Stabilizer',
-      image: 'https://recoverfit.co.uk/cdn/shop/products/ankle-brace-strap_540x.jpg',
-      url: 'https://recoverfit.co.uk/products/adjustable-ankle-stabilizer',
-      price: 29.99,
+      title: 'Theragun Mini',
+      image: 'https://recoverfit.co.uk/cdn/shop/products/Theragun-mini-Black-Carousel-05_600x600.webp?v=1691506967',
+      url: 'https://recoverfit.co.uk/products/theragun-mini',
+      price: 175.00,
       rating: 4.7,
       store: 'RecoverFit'
     }
   ]
 };
+
+/**
+ * Scrape RecoverFit.co.uk for products matching the search query
+ * @param {string} query - The search query
+ * @returns {Promise<Array>} - Array of product objects
+ */
+async function scrapeRecoverFitUsingAxios(query) {
+  try {
+    console.log(`Scraping RecoverFit.co.uk with axios for: "${query}"`);
+    
+    // Create search URL
+    const searchUrl = `https://recoverfit.co.uk/search?q=${encodeURIComponent(query)}`;
+    
+    // Fetch the search results page
+    const response = await axios.get(searchUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5'
+      },
+      timeout: 10000
+    });
+    
+    // Parse the HTML
+    const $ = cheerio.load(response.data);
+    const products = [];
+    
+    // Extract product information from the search results
+    $('.product-card').each((index, element) => {
+      try {
+        // Extract product details
+        const productUrl = 'https://recoverfit.co.uk' + $(element).find('a').attr('href');
+        const title = $(element).find('.product-card__title').text().trim();
+        let image = $(element).find('img').attr('src');
+        
+        // Fix image URL if needed
+        if (image && image.startsWith('//')) {
+          image = 'https:' + image;
+        }
+        
+        // Extract price
+        let price = $(element).find('.price__regular .price-item').text().trim();
+        price = price.replace(/[^0-9.]/g, '');
+        price = parseFloat(price);
+        
+        // Only add if we have the basic info
+        if (title && image && productUrl) {
+          products.push({
+            title,
+            image,
+            url: productUrl,
+            price: price || null,
+            rating: 4.5, // Default rating as the site doesn't show ratings
+            store: 'RecoverFit'
+          });
+        }
+      } catch (err) {
+        console.error('Error parsing product element:', err);
+      }
+    });
+    
+    console.log(`Found ${products.length} products using axios scraping`);
+    return products;
+  } catch (error) {
+    console.error('Axios scraping error:', error);
+    return [];
+  }
+}
+
+/**
+ * Scrape RecoverFit.co.uk using Puppeteer (headless browser)
+ * This is used as a fallback when simpler scraping fails
+ * @param {string} query - The search query
+ * @returns {Promise<Array>} - Array of product objects
+ */
+async function scrapeRecoverFitUsingPuppeteer(query) {
+  let browser = null;
+  
+  try {
+    console.log(`Scraping RecoverFit.co.uk with puppeteer for: "${query}"`);
+    
+    // Launch browser - use minimal args for compatibility with Render
+    browser = await puppeteer.launch({
+      headless: true,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-accelerated-2d-canvas',
+        '--disable-gpu'
+      ]
+    });
+    
+    const page = await browser.newPage();
+    
+    // Set viewport and user agent
+    await page.setViewport({ width: 1280, height: 800 });
+    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
+    
+    // Navigate to search page
+    const searchUrl = `https://recoverfit.co.uk/search?q=${encodeURIComponent(query)}`;
+    await page.goto(searchUrl, { waitUntil: 'networkidle2', timeout: 30000 });
+    
+    // Wait for products to load
+    await page.waitForSelector('.product-card', { timeout: 5000 }).catch(() => {
+      console.log('No product cards found');
+    });
+    
+    // Extract products from the page
+    const products = await page.evaluate(() => {
+      const items = [];
+      
+      document.querySelectorAll('.product-card').forEach(card => {
+        try {
+          const titleElement = card.querySelector('.product-card__title');
+          const linkElement = card.querySelector('a');
+          const imgElement = card.querySelector('img');
+          const priceElement = card.querySelector('.price__regular .price-item');
+          
+          if (titleElement && linkElement && imgElement) {
+            let price = priceElement ? priceElement.textContent.trim() : '';
+            price = price.replace(/[^0-9.]/g, '');
+            
+            let imgSrc = imgElement.getAttribute('src');
+            if (imgSrc && imgSrc.startsWith('//')) {
+              imgSrc = 'https:' + imgSrc;
+            }
+            
+            items.push({
+              title: titleElement.textContent.trim(),
+              url: 'https://recoverfit.co.uk' + linkElement.getAttribute('href'),
+              image: imgSrc,
+              price: price ? parseFloat(price) : null,
+              rating: 4.5, // Default rating
+              store: 'RecoverFit'
+            });
+          }
+        } catch (err) {
+          console.error('Error extracting product data:', err);
+        }
+      });
+      
+      return items;
+    });
+    
+    console.log(`Found ${products.length} products using puppeteer scraping`);
+    return products;
+  } catch (error) {
+    console.error('Puppeteer scraping error:', error);
+    return [];
+  } finally {
+    // Always close the browser
+    if (browser) {
+      await browser.close();
+    }
+  }
+}
 
 /**
  * Scrape products based on search query
@@ -151,30 +248,48 @@ async function scrapeProducts(params) {
     
     console.log(`Searching for products: "${query}"`);
     
-    // Find relevant results from our mock data
-    // In a real implementation, this would be a scrape of RecoverFit.co.uk
-    let results = [];
+    // Try scraping with axios/cheerio first
+    let products = await scrapeRecoverFitUsingAxios(query);
     
-    // Match the query against our mock data keys
-    for (const [key, products] of Object.entries(MOCK_PRODUCTS)) {
-      if (query.toLowerCase().includes(key) || key.includes(query.toLowerCase())) {
-        results = [...results, ...products];
-      }
+    // If that fails, try puppeteer as a fallback
+    if (products.length === 0) {
+      console.log('Axios scraping yielded no results, trying puppeteer...');
+      products = await scrapeRecoverFitUsingPuppeteer(query);
     }
     
-    // If no direct match, return products from first category as fallback
-    if (results.length === 0 && Object.keys(MOCK_PRODUCTS).length > 0) {
-      const firstCategory = Object.keys(MOCK_PRODUCTS)[0];
-      results = MOCK_PRODUCTS[firstCategory];
+    // If both scraping methods fail, use fallback data
+    if (products.length === 0) {
+      console.log('Both scraping methods failed, using fallback data...');
+      
+      // Find best matching category in fallback data
+      let bestCategory = '';
+      let bestMatchScore = 0;
+      
+      for (const category of Object.keys(FALLBACK_PRODUCTS)) {
+        if (query.toLowerCase().includes(category)) {
+          // Prioritize exact matches
+          if (category.length > bestMatchScore) {
+            bestCategory = category;
+            bestMatchScore = category.length;
+          }
+        }
+      }
+      
+      // If no direct match, use first category
+      if (!bestCategory && Object.keys(FALLBACK_PRODUCTS).length > 0) {
+        bestCategory = Object.keys(FALLBACK_PRODUCTS)[0];
+      }
+      
+      products = bestCategory ? FALLBACK_PRODUCTS[bestCategory] : [];
     }
     
     // Limit the number of results
-    results = results.slice(0, limit);
+    products = products.slice(0, limit);
     
-    console.log(`Found ${results.length} results for query: "${query}"`);
+    console.log(`Returning ${products.length} results for query: "${query}"`);
     
     // Format the results
-    const formattedResults = formatProductResults(results);
+    const formattedResults = formatProductResults(products);
     
     // Cache the results if caching is enabled
     if (useCache) {
