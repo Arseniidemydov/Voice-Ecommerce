@@ -30,7 +30,7 @@ app.post('/api/cache/clear', (req, res) => {
     res.json(clearCache());
 });
 
-// New product search endpoint using demo data
+// Product search endpoint using real scraping
 app.post('/api/products/search', async (req, res) => {
     console.log('Received product search request');
     try {
@@ -42,16 +42,35 @@ app.post('/api/products/search', async (req, res) => {
         
         console.log(`Searching for products: "${query}"`);
         
-        const results = await scrapeProducts({
-            query,
-            limit,
-            useCache
+        // Set a timeout to prevent long-running scrapes
+        const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('Search timed out after 25 seconds')), 25000);
         });
+        
+        // Race the scrape against the timeout
+        const results = await Promise.race([
+            scrapeProducts({
+                query,
+                limit,
+                useCache
+            }),
+            timeoutPromise
+        ]);
         
         res.json(results);
     } catch (error) {
         console.error('Product search error:', error);
-        res.status(500).json({ error: error.message });
+        
+        // Return a user-friendly error message
+        const errorMessage = error.message?.includes('timed out') 
+            ? 'The search is taking too long. Please try a different search term.'
+            : 'There was an error searching for products. Please try again.';
+            
+        res.status(500).json({ 
+            error: errorMessage,
+            text: `Sorry, ${errorMessage.toLowerCase()}`,
+            products: []
+        });
     }
 });
 
@@ -89,7 +108,7 @@ app.post('/api/openai/audio/speech', async (req, res) => {
     }
 });
 
-// New hybrid endpoint that uses OpenAI to understand the query then searches products
+// Hybrid endpoint that uses OpenAI to understand the query then searches products
 app.post('/api/assistant/products', async (req, res) => {
     try {
         const { message } = req.body;
@@ -105,38 +124,59 @@ app.post('/api/assistant/products', async (req, res) => {
         // First, use OpenAI to understand the query and extract search parameters
         console.log('Analyzing query with OpenAI:', message);
         
-        const completion = await openai.chat.completions.create({
-            model: "gpt-4o",
-            messages: [
-                {
-                    role: "system",
-                    content: "You are a product recommendation specialist. Extract search parameters from user queries. Return ONLY a JSON object with these fields: query (search string), category (optional), priceRange (optional), keyFeatures (array, optional), sortBy (optional). Nothing else."
-                },
-                { role: "user", content: message }
-            ],
-            response_format: { type: "json_object" }
-        });
-        
-        // Parse the search parameters from the OpenAI response
-        const searchParams = JSON.parse(completion.choices[0].message.content);
-        console.log('Extracted search parameters:', searchParams);
-        
-        // Use the extracted query to search for products
-        const searchQuery = searchParams.query;
-        
-        // Stream a message that we're searching
-        res.write(`data: ${JSON.stringify({ content: `Searching for "${searchQuery}"...` })}\n\n`);
-        
-        // Search for products using our scraper
-        const products = await scrapeProducts({
-            query: searchQuery,
-            limit: 5
-        });
-        
-        // Send the final response
-        res.write(`data: ${JSON.stringify({ content: products.text })}\n\n`);
-        res.write('data: [DONE]\n\n');
-        res.end();
+        try {
+            const completion = await openai.chat.completions.create({
+                model: "gpt-4o",
+                messages: [
+                    {
+                        role: "system",
+                        content: "You are a product recommendation specialist for RecoverFit.co.uk. Extract search parameters from user queries. Return ONLY a JSON object with these fields: query (search string), category (optional), priceRange (optional), keyFeatures (array, optional), sortBy (optional). Nothing else."
+                    },
+                    { role: "user", content: message }
+                ],
+                response_format: { type: "json_object" }
+            });
+            
+            // Parse the search parameters from the OpenAI response
+            const searchParams = JSON.parse(completion.choices[0].message.content);
+            console.log('Extracted search parameters:', searchParams);
+            
+            // Use the extracted query to search for products
+            const searchQuery = searchParams.query;
+            
+            // Stream a message that we're searching
+            res.write(`data: ${JSON.stringify({ content: `Searching RecoverFit.co.uk for "${searchQuery}"...` })}\n\n`);
+            
+            // Set a timeout for the search
+            const searchPromise = scrapeProducts({
+                query: searchQuery,
+                limit: 5
+            });
+            
+            const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error('Search timed out')), 25000);
+            });
+            
+            // Race the search against the timeout
+            const products = await Promise.race([searchPromise, timeoutPromise]);
+            
+            // Send the final response
+            res.write(`data: ${JSON.stringify({ content: products.text })}\n\n`);
+            res.write('data: [DONE]\n\n');
+            res.end();
+            
+        } catch (error) {
+            console.error('Error during product search:', error);
+            let errorMessage = 'Sorry, I had trouble finding products matching your request.';
+            
+            if (error.message?.includes('timed out')) {
+                errorMessage = 'Sorry, the search is taking too long. Could you try a more specific search term?';
+            }
+            
+            res.write(`data: ${JSON.stringify({ content: errorMessage })}\n\n`);
+            res.write('data: [DONE]\n\n');
+            res.end();
+        }
         
     } catch (error) {
         console.error('Hybrid search error:', error);
@@ -146,7 +186,7 @@ app.post('/api/assistant/products', async (req, res) => {
     }
 });
 
-// Original Assistant chat endpoint (keep for backward compatibility)
+// Original Assistant chat endpoint (keep for non-product queries)
 app.post('/api/assistant/chat', async (req, res) => {
     try {
         const { message } = req.body;
