@@ -30,33 +30,32 @@
         let lastSpeechTime = Date.now();
         const SILENCE_DURATION = 4000;
         const CHECKING_INTERVAL = 2000; 
-        let currentSlide = 0;
 
         const exampleQuestions = [
             "What's the best product for knee injury?",
             "Which compression therapy device is best for post-workout muscle recovery?",
-            "What’s the best product for reducing joint inflammation?",
+            "What's the best product for reducing joint inflammation?",
             "What is the best recovery product for improving sleep quality"
         ];
 
         function displayExampleQuestions() {
-    console.log('Displaying example questions...');  // Debug log
-    responseDiv.innerHTML = `
-        <div class="example-questions">
-            <h3>Try asking about:</h3>
-            <div class="questions-grid">
-                ${exampleQuestions.map(q => `
-                    <div class="question-card" onclick="handleExampleClick('${q}')">
-                        <p>${q}</p>
+            console.log('Displaying example questions...');
+            responseDiv.innerHTML = `
+                <div class="example-questions">
+                    <h3>Try asking about:</h3>
+                    <div class="questions-grid">
+                        ${exampleQuestions.map(q => `
+                            <div class="question-card" onclick="handleExampleClick('${q}')">
+                                <p>${q}</p>
+                            </div>
+                        `).join('')}
                     </div>
-                `).join('')}
-            </div>
-        </div>
-    `;
-}
+                </div>
+            `;
+        }
 
-// Call it immediately
-displayExampleQuestions();
+        // Call it immediately
+        displayExampleQuestions();
 
         async function handleExampleClick(question) {
             if (!hasPlayedWelcome) {
@@ -66,16 +65,15 @@ displayExampleQuestions();
             handleFinalTranscript(question);
         }
 
-
-function startSilenceDetection() {
-    clearInterval(silenceTimer);
-    silenceTimer = setInterval(() => {
-        const timeSinceLastSpeech = Date.now() - lastSpeechTime;
-        if (timeSinceLastSpeech > SILENCE_DURATION && !recognition.finalTranscript) {
-            stopListening();
+        function startSilenceDetection() {
+            clearInterval(silenceTimer);
+            silenceTimer = setInterval(() => {
+                const timeSinceLastSpeech = Date.now() - lastSpeechTime;
+                if (timeSinceLastSpeech > SILENCE_DURATION && !recognition.finalTranscript) {
+                    stopListening();
+                }
+            }, CHECKING_INTERVAL);
         }
-    }, CHECKING_INTERVAL);
-}
 
         async function playWelcomeMessage() {
             console.log('Playing welcome message...');
@@ -162,33 +160,14 @@ function startSilenceDetection() {
             }
         }
 
-        function addFollowUpSuggestions(response) {
-            if (response.toLowerCase().includes('multiple options') || 
-                response.toLowerCase().includes('several choices')) {
-                return `
-                    <div class="follow-up">
-                        <p>Would you like to:</p>
-                        <div class="follow-up-suggestions">
-                            <button class="follow-up-btn" onclick="handleFollowUp('Show me options under $50')">
-                                See budget options
-                            </button>
-                            <button class="follow-up-btn" onclick="handleFollowUp('Show me the top-rated ones')">
-                                See top-rated
-                            </button>
-                            <button class="follow-up-btn" onclick="handleFollowUp('Show me customer reviews')">
-                                Read reviews
-                            </button>
-                        </div>
-                    </div>
-                `;
-            }
-            return '';
-        }
-
         async function handleFollowUp(question) {
+            // Clear previous suggestions to avoid duplicates
+            const suggestions = document.querySelectorAll('.follow-up-section');
+            suggestions.forEach(s => s.remove());
+            
+            // Handle the follow-up question
             await handleFinalTranscript(question);
         }
-
 
         async function handleFinalTranscript(text) {
             if (text.trim().toLowerCase() === 'stop listening') {
@@ -249,53 +228,96 @@ function startSilenceDetection() {
         }
 
         function cleanImageUrl(url) {
-    // Remove markdown image syntax if present
-    const markdownMatch = url.match(/!\[.*?\]\((.*?)\)/);
-    if (markdownMatch) {
-        return markdownMatch[1]; // Return the URL part
-    }
-    return url.trim();
-}
+            // First check if it's a markdown image
+            const markdownMatch = url.match(/!\[(.*?)\]\((.*?)\)/);
+            if (markdownMatch) {
+                url = markdownMatch[2];
+            }
 
-function formatResponse(text) {
-    const sections = text.split('\n\n');
-    let mainText = sections[0];
-    let formattedResponse = `<p>${mainText}</p>`;
+            // Clean the URL
+            url = url.trim();
 
-    sections.forEach((section) => {
-        if (section.startsWith('Images:')) {
-            const lines = section.split('\n').slice(1); // Skip 'Images:' line
-            formattedResponse += '<div class="media-section">';
-            formattedResponse += '<div class="product-grid">';
-            
-            // Process lines in groups of 3 (image, name, url)
-            for (let i = 0; i < lines.length; i += 3) {
-                const imageUrl = cleanImageUrl(lines[i]?.trim() || '');
-                const productName = (lines[i + 1]?.replace('Product:', '').trim()) || '';
-                const productUrl = (lines[i + 2]?.replace('URL:', '').trim()) || '#';
+            // Check if we need to add https:
+            if (url.startsWith('//')) {
+                url = 'https:' + url;
+            }
 
-                if (imageUrl && productName && productUrl) {
+            // Remove any quotes if present
+            url = url.replace(/['"]/g, '');
+
+            return url;
+        }
+
+        function formatResponse(text) {
+            const sections = text.split('\n\n');
+            let mainText = sections[0];
+            let products = [];
+            let formattedResponse = `<p>${mainText}</p>`;
+
+            // First collect all products
+            sections.forEach((section) => {
+                if (section.startsWith('Images:')) {
+                    const lines = section.split('\n').slice(1);
+                    
+                    // Process lines in groups of 3 (image, name, url)
+                    for (let i = 0; i < lines.length; i += 3) {
+                        let imageUrl = cleanImageUrl(lines[i] || '');
+                        const productName = (lines[i + 1]?.replace('Product:', '').trim()) || '';
+                        const productUrl = (lines[i + 2]?.replace('URL:', '').trim()) || '#';
+
+                        if (imageUrl && productName && productUrl) {
+                            products.push({ imageUrl, productName, productUrl });
+                        }
+                    }
+                }
+            });
+
+            // Add all products in a single grid
+            if (products.length > 0) {
+                const gridClass = products.length === 1 ? 'single-product' : 'multiple-products';
+                formattedResponse += '<div class="media-section">';
+                formattedResponse += `<div class="product-grid ${gridClass}">`;
+                
+                products.forEach(product => {
                     formattedResponse += `
                         <div class="product-item">
-                            <a href="${productUrl}" target="_blank" class="product-link">
+                            <a href="${product.productUrl}" target="_blank" class="product-link">
                                 <div class="image-container">
-                                    <img src="${imageUrl}" alt="${productName}">
+                                    <img src="${product.imageUrl}" 
+                                         alt="${product.productName}"
+                                         onerror="this.onerror=null; this.src='/placeholder.jpg';">
                                 </div>
                                 <div class="product-info">
-                                    <h4 class="product-name">${productName}</h4>
+                                    <h4 class="product-name">${product.productName}</h4>
                                 </div>
                             </a>
                         </div>
                     `;
-                }
-            }
-            formattedResponse += '</div></div>';
-        }
-    });
+                });
+                
+                formattedResponse += '</div></div>';
 
-    formattedResponse += addFollowUpSuggestions(text);
-    return formattedResponse;
-}
+                // Add a single follow-up section at the bottom
+                formattedResponse += `
+                    <div class="follow-up-section">
+                        <h4>You might want to ask:</h4>
+                        <div class="suggestion-grid">
+                            <button class="suggestion-button" onclick="handleFollowUp('Show me alternative products')">
+                                Show me alternative products
+                            </button>
+                            <button class="suggestion-button" onclick="handleFollowUp('Tell me more about this product\\'s features')">
+                                Tell me more about this product's features
+                            </button>
+                            <button class="suggestion-button" onclick="handleFollowUp('What accessories go well with this?')">
+                                What accessories go well with this?
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }
+
+            return formattedResponse;
+        }
 
         function startListening() {
             if (!recognition) return;
@@ -329,7 +351,6 @@ function formatResponse(text) {
                 startListening();
             }
         };
-
     </script>
 </body>
 </html>
