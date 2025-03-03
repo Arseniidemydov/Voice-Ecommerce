@@ -138,10 +138,24 @@ body {
 
 .product-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    grid-template-columns: 1fr; /* Default for single product */
     gap: 25px;
     margin-top: 20px;
     width: 100%;
+    max-width: 800px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+/* When there are multiple products */
+.product-grid.multiple-products {
+    grid-template-columns: repeat(2, 1fr);
+}
+
+/* For single product */
+.product-grid.single-product {
+    max-width: 300px;
+    margin: 0 auto;
 }
 
 .product-item {
@@ -152,6 +166,12 @@ body {
     height: 100%;
     display: flex;
     flex-direction: column;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.product-item:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
 }
 
 .product-link {
@@ -167,6 +187,7 @@ body {
     padding-bottom: 100%; /* 1:1 Aspect ratio */
     position: relative;
     background: rgba(255, 255, 255, 0.02);
+    overflow: hidden;
 }
 
 .image-container img {
@@ -175,7 +196,20 @@ body {
     left: 0;
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    object-fit: contain; /* Changed from cover to contain */
+    background: rgba(255, 255, 255, 0.02);
+}
+
+/* Add a loading state */
+.image-container::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.05);
+    z-index: -1;
 }
 
 .product-info {
@@ -204,6 +238,45 @@ body {
 
 .media-link:hover {
     color: #99ccff;
+}
+
+.follow-up-section {
+    margin-top: 30px;
+    padding: 20px;
+    background: rgba(244, 209, 42, 0.1);
+    border-radius: 12px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.follow-up-section h4 {
+    color: #F4D12A;
+    margin: 0 0 15px 0;
+    font-size: 16px;
+    text-align: center;
+}
+
+.suggestion-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 10px;
+}
+
+.suggestion-button {
+    background: rgba(244, 209, 42, 0.2);
+    border: 1px solid rgba(244, 209, 42, 0.3);
+    border-radius: 8px;
+    padding: 12px 15px;
+    color: white;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 14px;
+    text-align: left;
+}
+
+.suggestion-button:hover {
+    background: rgba(244, 209, 42, 0.3);
+    transform: translateY(-2px);
 }
 
 .follow-up {
@@ -259,9 +332,24 @@ strong {
         grid-template-columns: 1fr;
     }
 
-    .product-grid {
-        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-        gap: 15px;
+    /* Keep 2 columns for products on mobile */
+    .product-grid.multiple-products {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 15px; /* Reduced gap on mobile */
+    }
+
+    .product-item {
+        /* Make items smaller on mobile */
+        min-width: 0;
+        width: 100%;
+    }
+
+    .product-info {
+        padding: 10px; /* Reduce padding */
+    }
+
+    .product-name {
+        font-size: 12px; /* Smaller font size */
     }
 
     #response {
@@ -269,11 +357,14 @@ strong {
         width: calc(100% - 40px);
     }
 
-    .follow-up-suggestions {
-        flex-direction: column;
+    .suggestion-grid {
+        grid-template-columns: 1fr; /* Stack suggestions on mobile */
     }
+}
 
-    .follow-up-btn {
-        width: 100%;
+/* Extra small devices */
+@media (max-width: 480px) {
+    .product-grid.multiple-products {
+        gap: 10px; /* Even smaller gap for very small screens */
     }
 }
