@@ -30,11 +30,11 @@ app.post('/api/cache/clear', (req, res) => {
     res.json(clearCache());
 });
 
-// New product search endpoint using FireCrawl
+// New product search endpoint using demo data
 app.post('/api/products/search', async (req, res) => {
     console.log('Received product search request');
     try {
-        const { query, limit = 5, websites = ['amazon', 'walmart'], useCache = true } = req.body;
+        const { query, limit = 5, useCache = true } = req.body;
         
         if (!query) {
             return res.status(400).json({ error: 'No search query provided' });
@@ -45,7 +45,6 @@ app.post('/api/products/search', async (req, res) => {
         const results = await scrapeProducts({
             query,
             limit,
-            websites,
             useCache
         });
         
@@ -131,8 +130,7 @@ app.post('/api/assistant/products', async (req, res) => {
         // Search for products using our scraper
         const products = await scrapeProducts({
             query: searchQuery,
-            limit: 5,
-            websites: ['amazon', 'walmart']
+            limit: 5
         });
         
         // Send the final response
@@ -197,7 +195,6 @@ app.get('/api/health', (req, res) => {
         status: 'ok',
         timestamp: new Date().toISOString(),
         openaiKeyPresent: !!process.env.OPENAI_API_KEY,
-        firecrawlKeyPresent: !!process.env.FIRECRAWL_API_KEY,
         cacheStats: getCacheStats()
     });
 });
@@ -218,5 +215,4 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
     console.log('OpenAI API Key present:', !!process.env.OPENAI_API_KEY);
-    console.log('FireCrawl API Key present:', !!process.env.FIRECRAWL_API_KEY);
 });
