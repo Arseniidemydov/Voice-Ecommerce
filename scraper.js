@@ -1,4 +1,5 @@
 const { FireCrawl } = require('@brightdata/firecrawl');
+const productCache = require('./cache');
 
 // Initialize FireCrawl with your API key
 const FIRECRAWL_API_KEY = process.env.FIRECRAWL_API_KEY;
@@ -11,11 +12,27 @@ const firecrawl = new FireCrawl(FIRECRAWL_API_KEY);
  * @param {number} params.limit - Maximum number of products to return
  * @param {string} params.sortBy - Sort order (optional)
  * @param {Array} params.websites - Specific websites to search (optional)
+ * @param {boolean} params.useCache - Whether to use cache (default: true)
  * @returns {Promise<Array>} - Array of formatted product objects
  */
 async function scrapeProducts(params) {
   try {
-    const { query, limit = 5, sortBy = 'relevance', websites = ['amazon', 'walmart'] } = params;
+    const { 
+      query, 
+      limit = 5, 
+      sortBy = 'relevance', 
+      websites = ['amazon', 'walmart'],
+      useCache = true 
+    } = params;
+    
+    // Check cache first if enabled
+    if (useCache) {
+      const cachedResults = productCache.get(query);
+      if (cachedResults) {
+        console.log(`Returning cached results for query: "${query}"`);
+        return cachedResults;
+      }
+    }
     
     // Configure the crawl job
     const jobConfig = {
@@ -34,7 +51,14 @@ async function scrapeProducts(params) {
     console.log(`Received ${results.length} results from FireCrawl`);
     
     // Format the results to match the expected format for the UI
-    return formatProductResults(results);
+    const formattedResults = formatProductResults(results);
+    
+    // Cache the results if caching is enabled
+    if (useCache) {
+      productCache.set(query, formattedResults);
+    }
+    
+    return formattedResults;
   } catch (error) {
     console.error('FireCrawl scraping error:', error);
     throw new Error(`Scraping failed: ${error.message}`);
@@ -67,7 +91,7 @@ function formatProductResults(products) {
       productUrl: product.url || '#',
       price: product.price ? `$${product.price}` : 'Price not available',
       rating: product.rating || null,
-      source: product.source || 'Online store'
+      source: product.source || product.store || 'Online store'
     };
   });
   
@@ -83,6 +107,24 @@ function formatProductResults(products) {
   };
 }
 
+/**
+ * Get cache statistics
+ * @returns {Object} Cache statistics
+ */
+function getCacheStats() {
+  return productCache.getStats();
+}
+
+/**
+ * Clear the cache
+ */
+function clearCache() {
+  productCache.cleanup();
+  return { message: 'Cache cleared successfully' };
+}
+
 module.exports = {
-  scrapeProducts
+  scrapeProducts,
+  getCacheStats,
+  clearCache
 };
