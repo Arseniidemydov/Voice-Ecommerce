@@ -2,124 +2,124 @@ const axios = require('axios');
 const productCache = require('./cache');
 
 /**
- * Mock product data for demo purposes
+ * Mock product data from RecoverFit.co.uk for demo purposes
  * In a real implementation, this would come from an API or web scraping
  */
 const MOCK_PRODUCTS = {
   'knee brace': [
     {
-      title: 'Premium Knee Brace Support',
-      image: 'https://m.media-amazon.com/images/I/71kT6C5wdtL._AC_SL1500_.jpg',
-      url: 'https://www.amazon.com/dp/B09MTFVH1H',
-      price: 29.99,
-      rating: 4.5,
-      store: 'Amazon'
+      title: 'Knee Sleeve for Sports and Daily Wear',
+      image: 'https://recoverfit.co.uk/cdn/shop/files/Knee-sleeve-pair-web_540x.jpg',
+      url: 'https://recoverfit.co.uk/products/recoverfit-knee-sleeve',
+      price: 25.99,
+      rating: 4.9,
+      store: 'RecoverFit'
     },
     {
-      title: 'Knee Compression Sleeve',
-      image: 'https://m.media-amazon.com/images/I/61N3XjyCLCL._AC_SL1500_.jpg',
-      url: 'https://www.amazon.com/dp/B075447CL9',
-      price: 19.97,
-      rating: 4.3,
-      store: 'Amazon'
-    },
-    {
-      title: 'Hinged Knee Brace for ACL',
-      image: 'https://m.media-amazon.com/images/I/71iUVvQGFzL._AC_SL1500_.jpg',
-      url: 'https://www.amazon.com/dp/B08L7FS623',
-      price: 39.99,
+      title: 'Adjustable Knee Support Brace',
+      image: 'https://recoverfit.co.uk/cdn/shop/products/knee-brace-velcro-closed_540x.jpg',
+      url: 'https://recoverfit.co.uk/products/adjustable-knitted-knee-brace',
+      price: 34.99,
       rating: 4.7,
-      store: 'Amazon'
+      store: 'RecoverFit'
+    },
+    {
+      title: 'Patella Stabilizing Knee Brace',
+      image: 'https://recoverfit.co.uk/cdn/shop/products/patella-stabilising-front_540x.jpg',
+      url: 'https://recoverfit.co.uk/products/knee-brace-with-patella-stabiliser',
+      price: 39.99,
+      rating: 4.8,
+      store: 'RecoverFit'
     }
   ],
   'compression therapy': [
     {
-      title: 'Professional Compression Leg Sleeves',
-      image: 'https://m.media-amazon.com/images/I/71HpVet24JL._AC_SL1500_.jpg',
-      url: 'https://www.amazon.com/dp/B07QLVMZ2W',
-      price: 24.99,
-      rating: 4.6,
-      store: 'Amazon'
-    },
-    {
-      title: 'Sequential Compression Device',
-      image: 'https://m.media-amazon.com/images/I/61kEBXGBdWL._AC_SL1500_.jpg',
-      url: 'https://www.amazon.com/dp/B07JVDXNSD',
-      price: 149.99,
-      rating: 4.5,
-      store: 'Amazon'
-    }
-  ],
-  'massage gun': [
-    {
-      title: 'Professional Deep Tissue Massage Gun',
-      image: 'https://m.media-amazon.com/images/I/71oiA8OHFqL._AC_SL1500_.jpg',
-      url: 'https://www.amazon.com/dp/B07ZBHQNWT',
-      price: 79.99,
-      rating: 4.8,
-      store: 'Amazon'
-    },
-    {
-      title: 'Percussion Massage Device',
-      image: 'https://m.media-amazon.com/images/I/71IjVnwJvuL._AC_SL1500_.jpg',
-      url: 'https://www.amazon.com/dp/B08BFX7LXC',
-      price: 119.99,
-      rating: 4.7,
-      store: 'Amazon'
-    }
-  ],
-  'joint inflammation': [
-    {
-      title: 'Natural Joint Support Supplement',
-      image: 'https://m.media-amazon.com/images/I/61DWa-0K1FL._AC_SL1000_.jpg',
-      url: 'https://www.amazon.com/dp/B0821W4H2H',
-      price: 34.99,
-      rating: 4.4,
-      store: 'Amazon'
-    },
-    {
-      title: 'Anti-Inflammatory Topical Cream',
-      image: 'https://m.media-amazon.com/images/I/71ZV9IOdp-L._AC_SL1500_.jpg',
-      url: 'https://www.amazon.com/dp/B07H95GD9C',
+      title: 'Compression Arm Sleeves',
+      image: 'https://recoverfit.co.uk/cdn/shop/products/Arm-compression-sleeve-camo_540x.jpg',
+      url: 'https://recoverfit.co.uk/products/compression-arm-sleeves',
       price: 19.99,
-      rating: 4.2,
-      store: 'Amazon'
-    }
-  ],
-  'recovery': [
-    {
-      title: 'Electric Muscle Stimulator',
-      image: 'https://m.media-amazon.com/images/I/61thRmYtxnL._AC_SL1500_.jpg',
-      url: 'https://www.amazon.com/dp/B07V5HP9Y6',
-      price: 49.99,
-      rating: 4.3,
-      store: 'Amazon'
-    },
-    {
-      title: 'Foam Roller for Muscle Recovery',
-      image: 'https://m.media-amazon.com/images/I/71IUzT-k0yL._AC_SL1500_.jpg',
-      url: 'https://www.amazon.com/dp/B078W5DBFL',
-      price: 29.99,
       rating: 4.6,
-      store: 'Amazon'
-    }
-  ],
-  'sleep': [
-    {
-      title: 'Weighted Blanket for Better Sleep',
-      image: 'https://m.media-amazon.com/images/I/71-QEI7-hiL._AC_SL1500_.jpg',
-      url: 'https://www.amazon.com/dp/B073429DV2',
-      price: 59.99,
-      rating: 4.5,
-      store: 'Amazon'
+      store: 'RecoverFit'
     },
     {
-      title: 'Natural Sleep Aid Supplement',
-      image: 'https://m.media-amazon.com/images/I/61lVbn8-JOL._AC_SL1000_.jpg',
-      url: 'https://www.amazon.com/dp/B0943N8VXM',
+      title: 'Compression Calf Sleeves',
+      image: 'https://recoverfit.co.uk/cdn/shop/products/black-calf-compression-sleeve_540x.jpg',
+      url: 'https://recoverfit.co.uk/products/compression-calf-sleeves',
+      price: 19.99,
+      rating: 4.7,
+      store: 'RecoverFit'
+    }
+  ],
+  'massage': [
+    {
+      title: 'Percussion Massage Gun',
+      image: 'https://recoverfit.co.uk/cdn/shop/products/Massage-gun-main_540x.jpg',
+      url: 'https://recoverfit.co.uk/products/recoverfit-percussion-massage-gun',
+      price: 129.99,
+      rating: 4.9,
+      store: 'RecoverFit'
+    },
+    {
+      title: 'Massage Roller Ball',
+      image: 'https://recoverfit.co.uk/cdn/shop/products/massage-ball-set_540x.jpg',
+      url: 'https://recoverfit.co.uk/products/massage-ball-set',
+      price: 19.99,
+      rating: 4.7,
+      store: 'RecoverFit'
+    }
+  ],
+  'wrist support': [
+    {
+      title: 'Adjustable Wrist Support',
+      image: 'https://recoverfit.co.uk/cdn/shop/products/wrist-support-close_540x.jpg',
+      url: 'https://recoverfit.co.uk/products/adjustable-wrist-support',
+      price: 14.99,
+      rating: 4.5,
+      store: 'RecoverFit'
+    },
+    {
+      title: 'Wrist and Thumb Support',
+      image: 'https://recoverfit.co.uk/cdn/shop/products/wrist-thumb-support-front_540x.jpg',
+      url: 'https://recoverfit.co.uk/products/wrist-and-thumb-support',
+      price: 19.99,
+      rating: 4.6,
+      store: 'RecoverFit'
+    }
+  ],
+  'back': [
+    {
+      title: 'Back Brace Support Belt',
+      image: 'https://recoverfit.co.uk/cdn/shop/products/back-brace-front_540x.jpg',
+      url: 'https://recoverfit.co.uk/products/back-brace-support-belt',
+      price: 39.99,
+      rating: 4.8,
+      store: 'RecoverFit'
+    },
+    {
+      title: 'Posture Corrector',
+      image: 'https://recoverfit.co.uk/cdn/shop/products/Clavicle-brace-front_540x.jpg',
+      url: 'https://recoverfit.co.uk/products/posture-corrector',
       price: 24.99,
-      rating: 4.4,
-      store: 'Amazon'
+      rating: 4.5,
+      store: 'RecoverFit'
+    }
+  ],
+  'ankle': [
+    {
+      title: 'Ankle Support Brace',
+      image: 'https://recoverfit.co.uk/cdn/shop/products/ankle-support-black-front_540x.jpg',
+      url: 'https://recoverfit.co.uk/products/ankle-support-brace',
+      price: 19.99,
+      rating: 4.6,
+      store: 'RecoverFit'
+    },
+    {
+      title: 'Adjustable Ankle Stabilizer',
+      image: 'https://recoverfit.co.uk/cdn/shop/products/ankle-brace-strap_540x.jpg',
+      url: 'https://recoverfit.co.uk/products/adjustable-ankle-stabilizer',
+      price: 29.99,
+      rating: 4.7,
+      store: 'RecoverFit'
     }
   ]
 };
@@ -129,8 +129,6 @@ const MOCK_PRODUCTS = {
  * @param {Object} params - Search parameters
  * @param {string} params.query - The search query
  * @param {number} params.limit - Maximum number of products to return
- * @param {string} params.sortBy - Sort order (optional)
- * @param {Array} params.websites - Specific websites to search (optional)
  * @param {boolean} params.useCache - Whether to use cache (default: true)
  * @returns {Promise<Object>} - Formatted product results
  */
@@ -154,7 +152,7 @@ async function scrapeProducts(params) {
     console.log(`Searching for products: "${query}"`);
     
     // Find relevant results from our mock data
-    // In a real implementation, this would be an API call to a scraping service
+    // In a real implementation, this would be a scrape of RecoverFit.co.uk
     let results = [];
     
     // Match the query against our mock data keys
@@ -164,7 +162,7 @@ async function scrapeProducts(params) {
       }
     }
     
-    // If no direct match, use the first category as a fallback
+    // If no direct match, return products from first category as fallback
     if (results.length === 0 && Object.keys(MOCK_PRODUCTS).length > 0) {
       const firstCategory = Object.keys(MOCK_PRODUCTS)[0];
       results = MOCK_PRODUCTS[firstCategory];
@@ -199,14 +197,14 @@ function formatProductResults(products) {
   // First, make sure we have valid products
   if (!products || !Array.isArray(products) || products.length === 0) {
     return { 
-      text: "Sorry, I couldn't find any products matching your query.",
+      text: "Sorry, I couldn't find any products matching your query on RecoverFit.co.uk.",
       products: []
     };
   }
   
   // Create the main text response
   const productCount = products.length;
-  let mainText = `I found ${productCount} products that might be what you're looking for:`;
+  let mainText = `I found ${productCount} products on RecoverFit.co.uk that might be what you're looking for:`;
   
   // Format the product data
   const formattedProducts = products.map(product => {
@@ -214,9 +212,9 @@ function formatProductResults(products) {
       imageUrl: product.image || '',
       productName: product.title || 'Product',
       productUrl: product.url || '#',
-      price: product.price ? `$${product.price}` : 'Price not available',
+      price: product.price ? `£${product.price}` : 'Price not available',
       rating: product.rating || null,
-      source: product.store || 'Online store'
+      source: product.store || 'RecoverFit'
     };
   });
   
